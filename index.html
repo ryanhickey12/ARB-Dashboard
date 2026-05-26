@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GDO/ARB Monthly Shipment Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #1a1a2e; padding: 20px; }
+  .header { text-align: center; padding: 20px; background: linear-gradient(135deg, #0076CE, #00447c); color: white; border-radius: 12px; margin-bottom: 24px; }
+  .header h1 { font-size: 1.8rem; margin-bottom: 6px; }
+  .header p { font-size: 0.95rem; opacity: 0.9; }
+  .flag-banner { background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: flex-start; gap: 12px; }
+  .flag-banner .icon { font-size: 2rem; }
+  .flag-banner .content h3 { color: #856404; margin-bottom: 4px; }
+  .flag-banner .content p { color: #664d03; font-size: 0.9rem; }
+  .flag-banner .stat { font-weight: 700; font-size: 1.3rem; color: #856404; }
+  .chart-container { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .chart-container h2 { margin-bottom: 16px; font-size: 1.2rem; color: #333; }
+  .chart-wrap { position: relative; width: 100%; max-height: 420px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #e9ecef; }
+  th { background: #0076CE; color: white; position: sticky; top: 0; font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  tr:hover { background: #f0f7ff; }
+  .highlight-row { background: #fff8e1 !important; }
+  .yoy-pos { color: #28a745; font-weight: 600; }
+  .yoy-neg { color: #dc3545; font-weight: 600; }
+  .yoy-na { color: #999; }
+  .badge-flag { display: inline-block; background: #ffc107; color: #664d03; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 4px; }
+  .table-container { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; overflow-x: auto; }
+  .table-container h2 { margin-bottom: 16px; font-size: 1.2rem; color: #333; }
+  .kpi-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .kpi { flex: 1; min-width: 180px; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; }
+  .kpi .value { font-size: 2rem; font-weight: 700; color: #0076CE; }
+  .kpi .label { font-size: 0.85rem; color: #666; margin-top: 4px; }
+  .legend-note { font-size: 0.8rem; color: #888; margin-top: 10px; text-align: center; }
+  .flag-detail-table { margin-top: 16px; }
+  .flag-detail-table th { background: #e8a100; }
+  .month-label { font-weight: 600; }
+  .partial-note { font-size: 0.75rem; color: #e67e00; font-style: italic; }
+  footer { text-align: center; color: #999; font-size: 0.8rem; margin-top: 30px; padding: 10px; }
+  .upload-container { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .upload-container h2 { margin-bottom: 16px; font-size: 1.2rem; color: #333; }
+  .upload-box { border: 2px dashed #0076CE; border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.3s; }
+  .upload-box:hover { background: #f0f7ff; border-color: #00447c; }
+  .upload-box input { display: none; }
+  .upload-label { font-size: 1rem; color: #0076CE; font-weight: 500; }
+  .upload-hint { font-size: 0.85rem; color: #666; margin-top: 8px; }
+  .file-info { margin-top: 12px; font-size: 0.9rem; color: #28a745; font-weight: 500; }
+  .sample-format { font-size: 0.8rem; color: #666; margin-top: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px; }
+  .sample-format code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📦 GDO/ARB Monthly Shipment Dashboard</h1>
+  <p>Units Requested by Month — Year-over-Year Comparison | Data: Aug 2019 – May 2026</p>
+</div>
+
+<div class="upload-container">
+  <h2>📤 Upload CSV Data</h2>
+  <div class="upload-box" onclick="document.getElementById('csvInput').click()" 
+       ondragover="event.preventDefault(); this.style.background='#f0f7ff'; this.style.borderColor='#00447c';"
+       ondragleave="event.preventDefault(); this.style.background=''; this.style.borderColor='#0076CE';"
+       ondrop="event.preventDefault(); this.style.background=''; this.style.borderColor='#0076CE'; handleDrop(event);">
+    <input type="file" id="csvInput" accept=".csv" onchange="handleCSVUpload(event)" />
+    <div class="upload-label">Click to upload CSV file</div>
+    <div class="upload-hint">or drag and drop here</div>
+  </div>
+  <div id="fileInfo" class="file-info"></div>
+  <div class="sample-format">
+    <strong>CSV Format:</strong> <code>part_number,quantity,week</code><br>
+    Example: <code>62PNR,240,5/18/2026</code><br>
+    Week format: M/D/YYYY or MM/DD/YYYY (e.g., 5/18/2026 or 05/18/2026)
+  </div>
+</div>
+
+<div id="app"></div>
+
+<footer>
+  Generated from ARB_FGAS.xlsx | Single-file HTML Dashboard
+</footer>
+
+<script>
+// ====== RAW DATA AGGREGATION FROM SOURCE [1] ======
+// Pre-aggregated monthly totals from the dataset
+
+const defaultMonthlyData = {
+  2019: { Aug: 17 },
+  2020: { Sep: 4, Nov: 1 },
+  2021: { Feb: 95, Mar: 2, May: 69, Jun: 2, Jul: 3, Aug: 21, Nov: 80, Dec: 3 },
+  2022: { Mar: 40, May: 233, Jun: 46, Aug: 570, Sep: 1, Oct: 783, Nov: 104, Dec: 113 },
+  2023: { Feb: 44, Mar: 181, Apr: 53, May: 744, Jun: 801, Aug: 2078, Sep: 2031, Oct: 838, Nov: 1080, Dec: 1080 },
+  2024: { Jan: 140, Feb: 543, Mar: 490, Apr: 420, May: 1080, Jun: 831, Jul: 878, Aug: 1100, Sep: 450, Oct: 394, Nov: 640, Dec: 323 },
+  2025: { Jan: 369, Feb: 536, Mar: 1357, Apr: 123, May: 195, Jun: 1623, Jul: 3934, Aug: 1484, Sep: 1289, Oct: 916, Nov: 5526, Dec: 614 },
+  2026: { Jan: 975, Feb: 2582, Mar: 161, Apr: 1759, May: 3505 }
+};
+
+let monthlyData = JSON.parse(JSON.stringify(defaultMonthlyData));
+
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const years = [2019,2020,2021,2022,2023,2024,2025,2026];
+const tableYears = [2023,2024,2025,2026];
+const yearColors = {
+  2019: '#ccc', 2020: '#adb5bd', 2021: '#6c757d', 2022: '#868e96',
+  2023: '#20c997', 2024: '#339af0', 2025: '#1864ab', 2026: '#e8590c'
+};
+
+// ====== CSV UPLOAD HANDLER ======
+function handleDrop(event) {
+  event.preventDefault();
+  const file = event.dataTransfer.files[0];
+  if (file && file.name.endsWith('.csv')) {
+    processCSVFile(file);
+  } else {
+    document.getElementById('fileInfo').textContent = '❌ Please drop a CSV file';
+    document.getElementById('fileInfo').style.color = '#dc3545';
+  }
+}
+
+function handleCSVUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  processCSVFile(file);
+}
+
+function processCSVFile(file) {
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results) {
+      try {
+        if (!results.data || results.data.length === 0) {
+          document.getElementById('fileInfo').textContent = '❌ CSV file is empty';
+          document.getElementById('fileInfo').style.color = '#dc3545';
+          return;
+        }
+
+        const newData = {};
+        const weekData = {};
+        const columns = Object.keys(results.data[0]);
+        
+        if (columns.length < 3) {
+          document.getElementById('fileInfo').textContent = '❌ CSV must have at least 3 columns';
+          document.getElementById('fileInfo').style.color = '#dc3545';
+          return;
+        }
+        
+        const partNumberColumn = columns[0];
+        const quantityColumn = columns[1];
+        const weekColumn = columns[2];
+        
+        results.data.forEach(row => {
+          const partNumber = row[partNumberColumn];
+          const quantity = parseInt(row[quantityColumn]);
+          const weekDate = row[weekColumn];
+          
+          if (weekDate && !isNaN(quantity)) {
+            // Parse week date (format: M/D/YYYY or MM/DD/YYYY)
+            const dateParts = weekDate.split('/');
+            if (dateParts.length === 3) {
+              const month = parseInt(dateParts[0]);
+              const year = parseInt(dateParts[2]);
+              const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+              const monthName = monthNames[month - 1];
+              
+              // Aggregate by year/month
+              if (!newData[year]) {
+                newData[year] = {};
+              }
+              if (!newData[year][monthName]) {
+                newData[year][monthName] = 0;
+              }
+              newData[year][monthName] += quantity;
+              
+              // Aggregate by week for flag data
+              if (!weekData[weekDate]) {
+                weekData[weekDate] = [];
+              }
+              weekData[weekDate].push({ fga: partNumber, units: quantity });
+            }
+          }
+        });
+
+        if (Object.keys(newData).length > 0) {
+          monthlyData = newData;
+          
+          // Find most recent week
+          const sortedWeeks = Object.keys(weekData).sort((a, b) => {
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            return dateB - dateA;
+          });
+          
+          if (sortedWeeks.length > 0) {
+            flagDate = sortedWeeks[0];
+            flagItems = weekData[flagDate];
+            flagTotal = flagItems.reduce((s,i)=>s+i.units,0);
+            flagTopItems = [...flagItems].sort((a,b)=>b.units-a.units).slice(0,10);
+          }
+          
+          document.getElementById('fileInfo').textContent = `✓ Loaded ${file.name} with ${results.data.length} rows`;
+          document.getElementById('fileInfo').style.color = '#28a745';
+          refreshDashboard();
+        } else {
+          document.getElementById('fileInfo').textContent = '❌ No valid data found in CSV';
+          document.getElementById('fileInfo').style.color = '#dc3545';
+        }
+      } catch (error) {
+        console.error('Error processing CSV:', error);
+        document.getElementById('fileInfo').textContent = '❌ Error processing CSV: ' + error.message;
+        document.getElementById('fileInfo').style.color = '#dc3545';
+      }
+    },
+    error: function(error) {
+      console.error('CSV parsing error:', error);
+      document.getElementById('fileInfo').textContent = '❌ Error parsing CSV: ' + error.message;
+      document.getElementById('fileInfo').style.color = '#dc3545';
+    }
+  });
+}
+
+// ====== FLAG DATA ======
+let flagDate = '5/18/2026';
+let flagItems = [
+  {fga:'62PNR',units:240},{fga:'4H8G6',units:550},{fga:'85NHY',units:1},{fga:'7HD13',units:33},
+  {fga:'8MNGY',units:12},{fga:'29D5F',units:17},{fga:'6M9C6',units:6},{fga:'DR538',units:54},
+  {fga:'YG0P4',units:38},{fga:'N0GPR',units:38},{fga:'V5HHJ',units:43},{fga:'MD63X',units:36},
+  {fga:'9DF3K',units:38},{fga:'YG2M1',units:26},{fga:'TJ37H',units:72},{fga:'9FGJT',units:47},
+  {fga:'3F2C4',units:20},{fga:'VFW2M',units:62},{fga:'N2TKF',units:29},{fga:'PYTNC',units:127},
+  {fga:'RFFY3',units:126},{fga:'HN81R',units:68},{fga:'N3PM3',units:35},{fga:'NGGNK',units:57},
+  {fga:'VCJT3',units:50},{fga:'R216T',units:40},{fga:'VH5H8',units:30},{fga:'0FMJ8',units:42},
+  {fga:'0WM07',units:36},{fga:'382NK',units:51},{fga:'WFHVW',units:40},{fga:'7MFW6',units:50},
+  {fga:'XCGHF',units:37},{fga:'NTRCG',units:45},{fga:'VG3TC',units:45},{fga:'392P5',units:47}
+];
+let flagTotal = flagItems.reduce((s,i)=>s+i.units,0);
+let flagTopItems = [...flagItems].sort((a,b)=>b.units-a.units).slice(0,10);
+
+// ====== COMPUTE KPIs ======
+function getYearTotal(yr) {
+  const d = monthlyData[yr] || {};
+  return Object.values(d).reduce((s,v)=>s+v,0);
+}
+
+let mainChartInstance = null;
+let yoyChartInstance = null;
+
+function refreshDashboard() {
+  // Destroy existing charts
+  if (mainChartInstance) {
+    mainChartInstance.destroy();
+  }
+  if (yoyChartInstance) {
+    yoyChartInstance.destroy();
+  }
+
+  // Recalculate KPIs
+  const total2026 = getYearTotal(2026);
+  const total2025 = getYearTotal(2025);
+  const total2024 = getYearTotal(2024);
+  const grandTotal = years.reduce((s,y)=>s+getYearTotal(y),0);
+
+  // Determine most recent month from flagDate
+  const flagDateParts = flagDate.split('/');
+  const flagMonth = parseInt(flagDateParts[0]);
+  const flagYear = parseInt(flagDateParts[2]);
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const flagMonthName = monthNames[flagMonth - 1];
+
+  // ====== BUILD HTML ======
+  const app = document.getElementById('app');
+
+  // KPI Cards
+  const kpiHTML = `
+  <div class="kpi-row">
+    <div class="kpi"><div class="value">${grandTotal.toLocaleString()}</div><div class="label">Total Units (All Years)</div></div>
+    <div class="kpi"><div class="value">${total2026.toLocaleString()}</div><div class="label">2026 YTD (thru May)</div></div>
+    <div class="kpi"><div class="value">${total2025.toLocaleString()}</div><div class="label">2025 Full Year</div></div>
+    <div class="kpi"><div class="value">${total2024.toLocaleString()}</div><div class="label">2024 Full Year</div></div>
+    <div class="kpi"><div class="value" style="color:#e8590c">${flagTotal.toLocaleString()}</div><div class="label">⚠️ 5/18/2026 Shipments</div></div>
+  </div>`;
+
+  // Flag Banner
+  const flagBannerHTML = `
+  <div class="flag-banner">
+    <div class="icon">⚠️</div>
+    <div class="content">
+      <h3>Most Recent Request Date: ${flagDate}</h3>
+      <p><span class="stat">${flagTotal.toLocaleString()} units</span> shipped across <strong>${flagItems.length} part numbers</strong> in a single week (FW16). 
+      Top SKUs include <strong>4H8G6</strong> (550 units), <strong>62PNR</strong> (240 units), <strong>PYTNC</strong> (127 units), and <strong>RFFY3</strong> (126 units).</p>
+      <table class="flag-detail-table" style="margin-top:12px;max-width:500px;">
+        <tr><th style="text-align:left">Part #</th><th>Units</th></tr>
+        ${flagTopItems.map(i=>`<tr><td style="text-align:left;font-family:monospace">${i.fga}</td><td>${i.units.toLocaleString()}</td></tr>`).join('')}
+        <tr style="font-weight:700;border-top:2px solid #c9971a"><td style="text-align:left">Top 10 Subtotal</td><td>${flagTopItems.reduce((s,i)=>s+i.units,0).toLocaleString()}</td></tr>
+      </table>
+    </div>
+  </div>`;
+
+  // Chart container
+  const chartHTML = `
+  <div class="chart-container">
+    <h2>📊 Monthly Shipment Quantities by Year</h2>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    <div class="legend-note">⚠️ ${flagMonthName} ${flagYear} is a partial month (through ${flagDate}). Bar includes the notable ${flagDate} shipment event.</div>
+  </div>
+  <div class="chart-container">
+    <h2>📈 Year-over-Year Trend: Same Month Comparison (2024 vs 2025 vs 2026)</h2>
+    <div class="chart-wrap"><canvas id="yoyChart"></canvas></div>
+  </div>`;
+
+  // Table
+  let tableRows = '';
+  
+  months.forEach(m => {
+    const isFlagMonth = m === flagMonthName;
+    const vals = tableYears.map(y => (monthlyData[y] || {})[m] || 0);
+    
+    // YoY calc (2025 vs 2024, 2026 vs 2025)
+    const v2024 = (monthlyData[2024] || {})[m] || 0;
+    const v2025 = (monthlyData[2025] || {})[m] || 0;
+    const v2026 = (monthlyData[2026] || {})[m] || 0;
+    
+    let yoy25v24 = '', yoy26v25 = '';
+    if(v2024 > 0 && v2025 > 0) {
+      const pct = ((v2025 - v2024)/v2024*100).toFixed(0);
+      yoy25v24 = pct >= 0 ? `<span class="yoy-pos">+${pct}%</span>` : `<span class="yoy-neg">${pct}%</span>`;
+    } else { yoy25v24 = '<span class="yoy-na">—</span>'; }
+    
+    if(v2025 > 0 && v2026 > 0) {
+      const pct = ((v2026 - v2025)/v2025*100).toFixed(0);
+      yoy26v25 = pct >= 0 ? `<span class="yoy-pos">+${pct}%</span>` : `<span class="yoy-neg">${pct}%</span>`;
+    } else { yoy26v25 = '<span class="yoy-na">—</span>'; }
+    
+    // Highlight the most recent week's month
+    const rowClass = (isFlagMonth && vals[vals.length - 1] > 0) ? 'highlight-row' : '';
+    const monthLabel = (isFlagMonth) 
+      ? `<span class="month-label">${m}</span> <span class="badge-flag">⚠️ ${flagDate} FLAG</span>` 
+      : `<span class="month-label">${m}</span>`;
+    
+    const flagNote = (isFlagMonth) ? `<br><span class="partial-note">${flagYear}: partial month thru ${flagDate}</span>` : '';
+    
+    tableRows += `<tr class="${rowClass}">
+      <td>${monthLabel}${flagNote}</td>
+      ${vals.map((v,i) => `<td>${v > 0 ? v.toLocaleString() : '—'}</td>`).join('')}
+      <td>${yoy25v24}</td>
+      <td>${yoy26v25}</td>
+    </tr>`;
+  });
+
+  // Year totals row
+  const yearTotals = tableYears.map(y => getYearTotal(y));
+  tableRows += `<tr style="font-weight:700;background:#e3f2fd;border-top:3px solid #0076CE">
+    <td>TOTAL</td>
+    ${yearTotals.map(v => `<td>${v.toLocaleString()}</td>`).join('')}
+    <td>${total2024 > 0 ? ((total2025-total2024)/total2024*100).toFixed(0)+'%' : '—'}</td>
+    <td style="font-size:0.75rem;color:#888">2026 partial</td>
+  </tr>`;
+
+  const tableHTML = `
+  <div class="table-container">
+    <h2>📋 Monthly Units by Year with YoY Change</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left">Month</th>
+          ${tableYears.map(y => `<th>${y}</th>`).join('')}
+          <th>YoY<br>25 vs 24</th>
+          <th>YoY<br>26 vs 25</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  </div>`;
+
+  app.innerHTML = kpiHTML + flagBannerHTML + chartHTML + tableHTML;
+
+  // ====== RENDER CHARTS ======
+  // Main bar/line combo chart
+  const mainCtx = document.getElementById('mainChart').getContext('2d');
+  const datasets = years.map(yr => {
+    const data = months.map(m => (monthlyData[yr] || {})[m] || 0);
+    const isCurrent = (yr === 2026);
+    const isPrior = (yr === 2025);
+    return {
+      label: String(yr),
+      data: data,
+      type: (yr >= 2025) ? 'bar' : 'line',
+      backgroundColor: isCurrent ? 'rgba(232,89,12,0.75)' : isPrior ? 'rgba(24,100,171,0.65)' : 'transparent',
+      borderColor: yearColors[yr],
+      borderWidth: (yr >= 2025) ? 1 : 2,
+      pointRadius: (yr < 2025) ? 3 : 0,
+      tension: 0.3,
+      order: (yr >= 2025) ? 1 : 0
+    };
+  });
+
+  mainChartInstance = new Chart(mainCtx, {
+    data: { labels: months, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } },
+        tooltip: {
+          callbacks: {
+            afterLabel: function(ctx) {
+              if(ctx.label === flagMonthName && ctx.dataset.label === String(flagYear)) {
+                return '⚠️ Includes ' + flagDate + ' event (' + flagTotal.toLocaleString() + ' units from that date)';
+              }
+              return '';
+            }
+          }
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Units Requested' },
+             ticks: { callback: v => v.toLocaleString() } }
+      }
+    }
+  });
+
+  // YoY comparison chart (2024 vs 2025 vs 2026)
+  const yoyCtx = document.getElementById('yoyChart').getContext('2d');
+  yoyChartInstance = new Chart(yoyCtx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: '2024', data: months.map(m => (monthlyData[2024] || {})[m] || 0),
+          backgroundColor: 'rgba(51,154,240,0.5)', borderColor: '#339af0', borderWidth: 1
+        },
+        {
+          label: '2025', data: months.map(m => (monthlyData[2025] || {})[m] || 0),
+          backgroundColor: 'rgba(24,100,171,0.65)', borderColor: '#1864ab', borderWidth: 1
+        },
+        {
+          label: '2026 (YTD)', data: months.map(m => (monthlyData[2026] || {})[m] || 0),
+          backgroundColor: 'rgba(232,89,12,0.75)', borderColor: '#e8590c', borderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, padding: 15 } },
+        annotation: {}
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Units Requested' },
+             ticks: { callback: v => v.toLocaleString() } }
+      }
+    }
+  });
+}
+
+// Initial render
+refreshDashboard();
+</script>
+</body>
+</html>
