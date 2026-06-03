@@ -58,7 +58,7 @@
 
 <div class="header">
   <h1>📦 GDO/ARB Monthly Shipment Dashboard</h1>
-  <p>Units Requested by Month — Year-over-Year Comparison | Data: Aug 2019 – May 2026</p>
+  <p>Units Requested by Month — Year-over-Year Comparison | Data: Jan 2024 – May 2026</p>
 </div>
 
 <div class="upload-container">
@@ -90,11 +90,6 @@
 // Pre-aggregated monthly totals from the dataset
 
 const defaultMonthlyData = {
-  2019: { Aug: 17 },
-  2020: { Sep: 4, Nov: 1 },
-  2021: { Feb: 95, Mar: 2, May: 69, Jun: 2, Jul: 3, Aug: 21, Nov: 80, Dec: 3 },
-  2022: { Mar: 40, May: 233, Jun: 46, Aug: 570, Sep: 1, Oct: 783, Nov: 104, Dec: 113 },
-  2023: { Feb: 44, Mar: 181, Apr: 53, May: 744, Jun: 801, Aug: 2078, Sep: 2031, Oct: 838, Nov: 1080, Dec: 1080 },
   2024: { Jan: 140, Feb: 543, Mar: 490, Apr: 420, May: 1080, Jun: 831, Jul: 878, Aug: 1100, Sep: 450, Oct: 394, Nov: 640, Dec: 323 },
   2025: { Jan: 369, Feb: 536, Mar: 1357, Apr: 123, May: 195, Jun: 1623, Jul: 3934, Aug: 1484, Sep: 1289, Oct: 916, Nov: 5526, Dec: 614 },
   2026: { Jan: 975, Feb: 2582, Mar: 161, Apr: 1759, May: 3505 }
@@ -103,11 +98,10 @@ const defaultMonthlyData = {
 let monthlyData = JSON.parse(JSON.stringify(defaultMonthlyData));
 
 const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const years = [2019,2020,2021,2022,2023,2024,2025,2026];
-const tableYears = [2023,2024,2025,2026];
+const years = [2024,2025,2026];
+const tableYears = [2024,2025,2026];
 const yearColors = {
-  2019: '#ccc', 2020: '#adb5bd', 2021: '#6c757d', 2022: '#868e96',
-  2023: '#20c997', 2024: '#339af0', 2025: '#1864ab', 2026: '#e8590c'
+  2024: '#339af0', 2025: '#1864ab', 2026: '#e8590c'
 };
 
 // ====== CSV UPLOAD HANDLER ======
